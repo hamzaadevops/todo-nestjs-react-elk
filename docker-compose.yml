@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   api:
-    build: ./todo-backend
+    build: ./backend
     container_name: todo-api
     environment:
       - MONGO_URL=mongodb://mongo:27017/todos
