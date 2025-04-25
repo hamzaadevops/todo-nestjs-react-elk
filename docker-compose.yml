@@ -1,0 +1,71 @@
+version: "3.9"
+
+services:
+  api:
+    build: ./todo-backend
+    container_name: todo-api
+    environment:
+      - MONGO_URL=mongodb://mongo:27017/todos
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://127.0.0.1:12201"   # ← host-side loopback
+    depends_on:
+      - mongo
+      - logstash
+    ports:
+      - "3000:3000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        - VITE_API=http://localhost:3000   # value baked in at build-time
+    container_name: todo-frontend
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+
+
+  mongo:
+    image: mongo:7
+    container_name: todo-mongo
+    restart: always
+    volumes:
+      - mongo-data:/data/db
+    ports:
+      - "27017:27017"
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.1
+    container_name: es
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.12.1
+    container_name: logstash
+    volumes:
+      - ./logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+    depends_on:
+      - elasticsearch
+    ports:
+      - "12201:12201/udp"          # expose GELF UDP port
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.12.1
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+
+volumes:
+  mongo-data:
